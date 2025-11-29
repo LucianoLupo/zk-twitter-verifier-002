@@ -34,28 +34,73 @@ Zero-knowledge Twitter verification POC with a 3-quest system. Prove your Twitte
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              USER'S BROWSER                              │
-│  ┌─────────────────────┐     ┌─────────────────────────────────────────┐ │
-│  │   React Frontend    │     │      LupoVerify Extension               │ │
-│  │   (Quest UI)        │◄────│  ├── quest-1-profile.wasm               │ │
-│  │   Port: 5173        │     │  ├── quest-2-tweet.wasm                 │ │
-│  └──────────┬──────────┘     │  └── quest-3-engagement.wasm            │ │
-└─────────────┼────────────────└──────────────────┬──────────────────────┘
-              │ REST API                          │ MPC-TLS
-              ▼                                   ▼
-┌─────────────────────────┐     ┌─────────────────────────────────────────┐
-│    NestJS Backend       │     │         Notary Infrastructure           │
-│    Port: 3000           │     │  ┌─────────────┐ ┌─────────────────────┐ │
-│    SQLite DB            │     │  │ Notary 7047 │ │ wstcp Proxy 55688   │ │
-└─────────────┬───────────┘     │  └─────────────┘ └─────────────────────┘ │
-              │                 └─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              USER'S BROWSER                                   │
+│                                                                              │
+│  ┌─────────────────────┐          ┌─────────────────────────────────────┐    │
+│  │   React Frontend    │  IPC     │      LupoVerify Extension           │    │
+│  │   (Quest UI)        │◄────────►│  ├── quest-1-profile.wasm           │    │
+│  │   Port: 5173        │          │  ├── quest-2-tweet.wasm             │    │
+│  └──────────┬──────────┘          │  └── quest-3-engagement.wasm        │    │
+│             │                     └──────────┬───────────────────────────┘   │
+│             │                                │                               │
+└─────────────┼────────────────────────────────┼───────────────────────────────┘
+              │                                │
+              │ REST API                       │ HTTPS (User's IP)
+              │                                ▼
+              │                     ┌─────────────────────────┐
+              │                     │   Twitter API           │
+              │                     │   api.x.com             │
+              │                     │   (sees user's IP)      │
+              │                     └─────────────────────────┘
+              │
+              ▼
+┌─────────────────────────┐
+│    NestJS Backend       │
+│    Port: 3000           │
+│    SQLite DB            │
+└─────────────┬───────────┘
+              │
               ▼
 ┌─────────────────────────┐
 │   Rust Verifier         │
 │   Port: 8080            │
 │   (tlsn-core)           │
 └─────────────────────────┘
+```
+
+### MPC-TLS Notarization Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         USER'S BROWSER (Extension)                          │
+│                                                                             │
+│   1. Initiate TLS handshake with Twitter                                    │
+│   2. MPC protocol splits TLS keys between browser & notary                  │
+│   3. Make HTTPS request to Twitter (USER'S IP seen by Twitter)              │
+│   4. Receive encrypted response                                             │
+│   5. Generate proof of response authenticity                                │
+│                                                                             │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+            ┌───────────────────┴───────────────────┐
+            │                                       │
+            ▼                                       ▼
+┌───────────────────────┐               ┌───────────────────────┐
+│   Twitter API         │               │   Notary Server       │
+│   api.x.com:443       │               │   localhost:7047      │
+│                       │               │                       │
+│   • Sees user's IP    │               │   • MPC-TLS co-signer │
+│   • Normal HTTPS      │               │   • Never sees data   │
+│   • No idea about     │               │   • Only validates    │
+│     notarization      │               │     TLS session       │
+└───────────────────────┘               └───────────────────────┘
+
+Key Privacy Properties:
+├── Twitter sees: Normal request from user's IP address
+├── Notary sees: Encrypted TLS traffic only (no plaintext)
+├── User gets: Cryptographic proof of authentic response
+└── Verifier: Can validate proof without contacting Twitter
 ```
 
 ## Quick Start
@@ -187,14 +232,77 @@ zk-twitter-verifier/
 
 ## How It Works
 
-1. **Connect Wallet**: User connects MetaMask to the frontend
-2. **Start Quest**: Click "Start Quest" to trigger plugin execution
-3. **Extension Popup**: LupoVerify extension shows approval dialog
-4. **MPC-TLS Notarization**: Extension performs TLS session with Twitter API via notary
-5. **Proof Generation**: WASM plugin extracts and redacts data, generates ZK proof
-6. **Wallet Signature**: User signs the submission with MetaMask
-7. **Backend Verification**: Rust verifier validates the TLSNotary proof
-8. **Quest Completion**: Backend records completion in SQLite database
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│  User   │     │Frontend │     │Extension│     │ Twitter │     │ Notary  │
+└────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘
+     │               │               │               │               │
+     │ 1. Connect    │               │               │               │
+     │   Wallet      │               │               │               │
+     │──────────────►│               │               │               │
+     │               │               │               │               │
+     │ 2. Start      │ 3. Run Plugin │               │               │
+     │   Quest       │   (IPC)       │               │               │
+     │──────────────►│──────────────►│               │               │
+     │               │               │               │               │
+     │               │  4. Approval  │               │               │
+     │◄──────────────│◄──────────────│               │               │
+     │               │               │               │               │
+     │ 5. Approve    │               │               │               │
+     │──────────────►│──────────────►│               │               │
+     │               │               │               │               │
+     │               │               │ 6. MPC-TLS    │               │
+     │               │               │   Handshake   │               │
+     │               │               │◄─────────────────────────────►│
+     │               │               │               │               │
+     │               │               │ 7. HTTPS      │               │
+     │               │               │   Request     │               │
+     │               │               │──────────────►│               │
+     │               │               │   (User's IP) │               │
+     │               │               │               │               │
+     │               │               │◄──────────────│               │
+     │               │               │  8. Response  │               │
+     │               │               │               │               │
+     │               │               │ 9. Generate   │               │
+     │               │               │    Proof      │               │
+     │               │               │──────────────────────────────►│
+     │               │               │◄──────────────────────────────│
+     │               │               │  10. Signed   │               │
+     │               │               │      Proof    │               │
+     │               │               │               │               │
+     │               │◄──────────────│               │               │
+     │               │  11. Proof    │               │               │
+     │               │               │               │               │
+     │ 12. Sign with │               │               │               │
+     │    MetaMask   │               │               │               │
+     │◄──────────────│               │               │               │
+     │──────────────►│               │               │               │
+     │               │               │               │               │
+     │               │ 13. Submit to Backend         │               │
+     │               │─────────────────────────────► │               │
+     │               │        (Rust Verifier)        │               │
+     │               │                               │               │
+     │               │◄───────────────────────────── │               │
+     │◄──────────────│  14. Quest Complete!          │               │
+     │               │               │               │               │
+```
+
+### Step Details
+
+1. **Connect Wallet** - User connects MetaMask to the frontend
+2. **Start Quest** - Click "Start Quest" to trigger plugin execution
+3. **Run Plugin** - Frontend sends IPC message to extension
+4. **Approval Dialog** - Extension shows what data will be accessed
+5. **User Approves** - User confirms the notarization request
+6. **MPC-TLS Handshake** - Extension & notary establish shared TLS session
+7. **HTTPS Request** - Extension fetches from Twitter (**user's IP is seen**)
+8. **Response** - Twitter returns data (only user can decrypt)
+9. **Generate Proof** - Extension creates proof of response authenticity
+10. **Notary Signs** - Notary co-signs the proof (without seeing content)
+11. **Return Proof** - Proof sent back to frontend
+12. **Wallet Signature** - User signs submission with MetaMask
+13. **Backend Verification** - Rust verifier validates TLSNotary proof
+14. **Quest Complete** - Backend records completion in SQLite
 
 ## License
 
