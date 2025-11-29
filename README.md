@@ -1,14 +1,35 @@
 # LupoVerify - ZK Twitter Quest System
 
-Zero-knowledge Twitter verification POC with a 3-quest system. Prove your Twitter identity and actions using cryptographic proofs powered by TLSNotary.
+Zero-knowledge Twitter verification POC with a 3-quest system. Prove your Twitter identity and actions using cryptographic proofs powered by TLSNotary's MPC-TLS protocol.
+
+## Screenshots
+
+| Verification In Progress | Verification Completed |
+|--------------------------|------------------------|
+| ![Verification In Progress](docs/images/Screenshot1.png) | ![Verification Completed](docs/images/Screenshot2.png) |
+
+## Related Repositories
+
+- **[LupoVerify Extension](https://github.com/LucianoLupo/lupo-verify-extension)** - Fork of TLSNotary extension with dark glass UI theme
 
 ## Features
 
 - **Quest 1**: Verify Twitter profile ownership
 - **Quest 2**: Prove you authored a specific tweet
 - **Quest 3**: Prove you liked AND retweeted a specific tweet
-- **Wallet Integration**: All verifications linked to your Ethereum address
-- **SQLite Storage**: Lightweight database for quest completion tracking
+- **Wallet Integration**: MetaMask signature required for all submissions
+- **Dark Glass UI**: Modern glassmorphism design theme
+- **Real-time Progress**: Live notarization progress in extension side panel
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Frontend | React 18 + Vite + wagmi |
+| Backend | NestJS + SQLite |
+| Verifier | Rust + tlsn-core |
+| Extension | TLSNotary fork (MV3) |
+| Proofs | TLSNotary MPC-TLS |
 
 ## Architecture
 
@@ -43,31 +64,39 @@ Zero-knowledge Twitter verification POC with a 3-quest system. Prove your Twitte
 
 1. **Node.js** v18+
 2. **Rust** (for verifier and notary)
-3. **TLSNotary Browser Extension** (or LupoVerify fork)
-4. **Ethereum Wallet** (MetaMask)
+3. **[LupoVerify Extension](https://github.com/LucianoLupo/lupo-verify-extension)** (built from source)
+4. **MetaMask** or compatible Ethereum wallet
 
-### 1. Start the Local Notary Server
+### 1. Clone and Setup Extension
 
 ```bash
-# If not already built
-cd ~/projects/tlsn
+git clone https://github.com/LucianoLupo/lupo-verify-extension.git
+cd lupo-verify-extension
+npm install
+npm run build
+# Load build/ folder in chrome://extensions (Developer mode)
+```
+
+### 2. Start the Local Notary Server
+
+```bash
+# Clone and build TLSNotary
+git clone https://github.com/tlsnotary/tlsn.git
+cd tlsn
 cargo build --release -p notary-server
 
 # Run notary server
 ./target/release/notary-server --config ~/.notary-server/config/config.yaml
 ```
 
-### 2. Start the WebSocket Proxy
+### 3. Start the WebSocket Proxy
 
 ```bash
-# Install if needed
 cargo install wstcp
-
-# Run proxy
 wstcp --bind-addr 127.0.0.1:55688 api.x.com:443
 ```
 
-### 3. Start the Rust Verifier
+### 4. Start the Rust Verifier
 
 ```bash
 cd verifier
@@ -75,7 +104,7 @@ RUST_LOG=info cargo run
 # Listening on http://localhost:8080
 ```
 
-### 4. Start the Backend
+### 5. Start the Backend
 
 ```bash
 cd backend
@@ -84,7 +113,7 @@ npm run start:dev
 # API running on http://localhost:3000
 ```
 
-### 5. Start the Frontend
+### 6. Start the Frontend
 
 ```bash
 cd frontend
@@ -128,6 +157,7 @@ POST /api/quest/:questNumber/submit
 {
   "walletAddress": "0x...",
   "proof": { ... },
+  "signature": { ... },
   "tweetUrl": "https://x.com/..." // For Quest 2/3
 }
 ```
@@ -135,15 +165,14 @@ POST /api/quest/:questNumber/submit
 ## Project Structure
 
 ```
-zk-twitter-verifier-002/
+zk-twitter-verifier/
 ├── backend/           # NestJS API + SQLite
-├── frontend/          # React + wagmi
-├── verifier/          # Rust proof verification
-├── plugins/           # TLSNotary WASM plugins
-│   ├── quest-1-profile/
-│   ├── quest-2-tweet/
-│   └── quest-3-engagement/
-└── extension/         # LupoVerify (TLSNotary fork)
+├── frontend/          # React + Vite + wagmi
+├── verifier/          # Rust proof verification (tlsn-core)
+└── plugins/           # TLSNotary WASM plugins
+    ├── quest-1-profile/
+    ├── quest-2-tweet/
+    └── quest-3-engagement/
 ```
 
 ## Ports
@@ -156,35 +185,16 @@ zk-twitter-verifier-002/
 | Backend API | 3000 |
 | Frontend | 5173 |
 
-## Environment Variables
+## How It Works
 
-### Backend
-- `DATABASE_PATH`: SQLite database path (default: `./data/quests.db`)
-- `RUST_VERIFIER_URL`: Verifier service URL (default: `http://localhost:8080`)
-
-### Frontend
-- `VITE_API_URL`: Backend API URL (default: `http://localhost:3000`)
-
-### Verifier
-- `RUST_LOG`: Log level (default: `info`)
-
-## Development
-
-### Building Plugins
-
-```bash
-cd plugins/quest-1-profile
-npm install
-npm run build
-# Output: dist/index.tlsn.wasm
-```
-
-### Database Schema
-
-The backend uses SQLite with these tables:
-- `users`: Wallet addresses and Twitter handles
-- `quest_completions`: Quest progress per user
-- `proofs`: Stored proof data (legacy)
+1. **Connect Wallet**: User connects MetaMask to the frontend
+2. **Start Quest**: Click "Start Quest" to trigger plugin execution
+3. **Extension Popup**: LupoVerify extension shows approval dialog
+4. **MPC-TLS Notarization**: Extension performs TLS session with Twitter API via notary
+5. **Proof Generation**: WASM plugin extracts and redacts data, generates ZK proof
+6. **Wallet Signature**: User signs the submission with MetaMask
+7. **Backend Verification**: Rust verifier validates the TLSNotary proof
+8. **Quest Completion**: Backend records completion in SQLite database
 
 ## License
 
