@@ -1,0 +1,45 @@
+{
+    "title": "Quest 1: Verify Twitter Profile",
+    "description": "Prove ownership of your Twitter account",
+    "steps": [
+        {
+            "title": "Visit Twitter website",
+            "cta": "Go to x.com",
+            "action": "start"
+        },
+        {
+            "title": "Collect credentials",
+            "description": "Login to your account if you haven't already",
+            "cta": "Check cookies",
+            "action": "two"
+        },
+        {
+            "title": "Notarize twitter profile",
+            "cta": "Notarize",
+            "action": "three",
+            "prover": true
+        }
+    ],
+    "hostFunctions": [
+        "redirect",
+        "notarize"
+    ],
+    "cookies": [
+        "https://api.x.com/1.1/account/settings.json"
+    ],
+    "headers": [
+        "https://api.x.com/1.1/account/settings.json"
+    ],
+    "requests": [
+        {
+            "url": "https://api.x.com/1.1/account/settings.json",
+            "method": "GET"
+        }
+    ],
+    "notaryUrls": [
+        "http://localhost:7047"
+    ],
+    "proxyUrls": [
+        "ws://localhost:55688"
+    ]
+}

@@ -1,0 +1,47 @@
+{
+    "title": "Quest 2: Verify Tweet Authorship",
+    "description": "Prove you authored a specific tweet",
+    "steps": [
+        {
+            "title": "Visit Twitter website",
+            "description": "We'll navigate to Twitter to capture your session",
+            "cta": "Go to x.com",
+            "action": "start"
+        },
+        {
+            "title": "Collect credentials",
+            "description": "Login to your account if you haven't already",
+            "cta": "Check cookies",
+            "action": "two"
+        },
+        {
+            "title": "Notarize tweet authorship",
+            "description": "Creating proof that you authored this tweet",
+            "cta": "Notarize",
+            "action": "three",
+            "prover": true
+        }
+    ],
+    "hostFunctions": [
+        "redirect",
+        "notarize"
+    ],
+    "cookies": [
+        "https://api.x.com/1.1/statuses/show.json"
+    ],
+    "headers": [
+        "https://api.x.com/1.1/statuses/show.json"
+    ],
+    "requests": [
+        {
+            "url": "https://api.x.com/1.1/statuses/show.json",
+            "method": "GET"
+        }
+    ],
+    "notaryUrls": [
+        "http://localhost:7047"
+    ],
+    "proxyUrls": [
+        "ws://localhost:55688"
+    ]
+}

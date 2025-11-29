@@ -1,0 +1,47 @@
+{
+    "title": "Quest 3: Verify Engagement",
+    "description": "Prove you liked AND retweeted a specific tweet",
+    "steps": [
+        {
+            "title": "Visit Twitter website",
+            "description": "We'll navigate to the tweet to capture your engagement",
+            "cta": "Go to x.com",
+            "action": "start"
+        },
+        {
+            "title": "Collect credentials",
+            "description": "Login to your account if you haven't already",
+            "cta": "Check cookies",
+            "action": "two"
+        },
+        {
+            "title": "Notarize engagement",
+            "description": "Creating proof that you liked and retweeted this tweet",
+            "cta": "Notarize",
+            "action": "three",
+            "prover": true
+        }
+    ],
+    "hostFunctions": [
+        "redirect",
+        "notarize"
+    ],
+    "cookies": [
+        "https://x.com/i/api/graphql"
+    ],
+    "headers": [
+        "https://x.com/i/api/graphql"
+    ],
+    "requests": [
+        {
+            "url": "https://x.com/i/api/graphql/*/TweetDetail",
+            "method": "GET"
+        }
+    ],
+    "notaryUrls": [
+        "http://localhost:7047"
+    ],
+    "proxyUrls": [
+        "ws://localhost:55688"
+    ]
+}
